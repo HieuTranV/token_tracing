@@ -31,8 +31,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo]) -> ProgramResult {
     // * Allocate data to vault
     let account_info = ExchangeAccount {
         admin: *payer.key,
-        vault: *vault.key,
-        mint: *mint.key
+        vault: *vault.key
     };
 
 

@@ -19,7 +19,6 @@ import * as Buff from "@solana/buffer-layout-utils";
 let connection: Connection;
 let programId: PublicKey;
 let payer: Keypair;
-// let mintPubkey: PublicKey;
 let payerTokenAccount: Account;
 let vault: PublicKey;
 let vaultTokenAccount: Account;
@@ -27,7 +26,6 @@ let mintPubkey: PublicKey;
 const PROGRAM_PATH = path.resolve(__dirname, '../dist/program');
 const PROGRAM_SO_PATH = path.join(PROGRAM_PATH, 'tokentracing.so');
 const PROGRAM_KEYPAIR_PATH = path.join(PROGRAM_PATH, 'tokentracing-keypair.json');
-const SOL_AMOUNT_TO_SWAP = 0.0001;
 
 
 
@@ -48,9 +46,7 @@ export async function establishPayer(): Promise<void> {
     if (!payer) {
         const { feeCalculator } = await connection.getRecentBlockhash();
 
-
-        // Calculate the cost of sending transactions
-        fees += feeCalculator.lamportsPerSignature * 100; // wag
+        fees += feeCalculator.lamportsPerSignature * 100; 
 
         payer = await getPayer();
     }
@@ -59,7 +55,6 @@ export async function establishPayer(): Promise<void> {
     console.log("Current SOL is ", curLamport / LAMPORTS_PER_SOL);
     fees += LAMPORTS_PER_SOL;
     if (curLamport < fees) {
-        // If current balance is not enough to pay for fees, request an airdrop
         const sig = await connection.requestAirdrop(
             payer.publicKey,
             fees - curLamport,
@@ -77,17 +72,6 @@ export async function establishPayer(): Promise<void> {
     );
 }
 
-// export async function establishMint(): Promise<void> {
-//     mintPubkey = await  createMint(
-//         connection,
-//         payer,
-//         payer.publicKey,
-//         payer.publicKey,
-//         9
-//     )
-
-//     console.log("Token: ", mintPubkey.toBase58());
-// }
 export async function establishMint(): Promise<void> {
     mintPubkey = new PublicKey("BWQvrPzZZVndXNYPv6VB5P6bbQsHyEvtBpNgDwNxicWi");
 }
@@ -114,7 +98,6 @@ export async function mintToPayer() {
 }
 
 export async function checkProgram(): Promise<void> {
-    // Read program id from keypair file
     try {
         const programKeypair = await createKeypairFromFile(PROGRAM_KEYPAIR_PATH);
         programId = programKeypair.publicKey;
@@ -125,12 +108,11 @@ export async function checkProgram(): Promise<void> {
         );
     }
 
-    // Check if the program has been deployed
     const programInfo = await connection.getAccountInfo(programId);
     if (programInfo === null) {
         if (fs.existsSync(PROGRAM_SO_PATH)) {
             throw new Error(
-                'Program needs to be deployed with `solana program deploy dist/program/helloworld.so`',
+                'Program needs to be deployed with `solana program deploy dist/program/tokentracing.so`',
             );
         } else {
             throw new Error('Program needs to be built and deployed');
@@ -147,7 +129,7 @@ export async function establishVault(): Promise<void> {
         programId
     );
     vault = vaultAddress;
-    console.log(`Using vault ${vault.toBase58()}`);
+    console.log("Vault: ", vault.toBase58());
 }
 
 export async function establishVaultAta(): Promise<void> {
@@ -158,7 +140,6 @@ export async function establishVaultAta(): Promise<void> {
         vault,
         true
     );
-    // console.log(`Using vaultAta ${vaultTokenAccount.address.toBase58()}`);
 }
 
 
@@ -199,15 +180,9 @@ export async function initialize() {
         new Transaction().add(instruction),
         [payer]
     );
-    console.log(
-        `Finish initialize, more info: \nhttps://explorer.solana.com/tx/${txSig}?cluster=custom`
-    );
-
-    // await airdropSolIfNeeded(vault); //airdrop after create vault on-chain
 }
 
 function swapSolToToken(): InstructionData {
-    // const layout = BufferLayout.struct([BufferLayout.u8("instruction"), Buff.u64("instruction")])
     const layout = BufferLayout.struct([BufferLayout.u8("instruction") as BufferLayout.Layout<never>, BufferLayout.u32("amount") as BufferLayout.Layout<never>]);
     const data = Buffer.alloc(layout.span);
     layout.encode({ instruction: 1, amount: LAMPORTS_PER_SOL }, data);
@@ -255,21 +230,8 @@ function swapSolToToken(): InstructionData {
     ]
 
     return { data, keys }
-    // const instruction = new TransactionInstruction({
-    //     keys: ,
-    //     programId,
-    //     data: instructionData,
-    // });
-
-    // const swapSig = await sendAndConfirmTransaction(
-    //     connection,
-    //     new Transaction().add(instruction),
-    //     [payer]
-    // );
-    // console.log(
-    //     `Finish swap Sol to Token, more info:  \nhttps://explorer.solana.com/tx/${swapSig}?cluster=custom`
-    // );
 }
+
 export async function execute(index: string): Promise<boolean> {
     console.log(index)
     let instructionData: InstructionData = { data: Buffer.alloc(0), keys: [] };
@@ -298,54 +260,54 @@ export async function execute(index: string): Promise<boolean> {
 
     return true;
 }
+
+
 function swapTokenToSol(): InstructionData {
     const layout = BufferLayout.struct([BufferLayout.u8("instruction") as BufferLayout.Layout<never>, BufferLayout.u32("amount") as BufferLayout.Layout<never>]);
 
     const data = Buffer.alloc(layout.span);
     layout.encode({ instruction: 2, amount: LAMPORTS_PER_SOL }, data);
-
     let keys = [
-        {
-            pubkey: programId,
-            isSigner: false,
-            isWritable: true,
-        },
-        {
-            pubkey: payer.publicKey,
-            isSigner: true,
-            isWritable: true,
-        },
-        {
-            pubkey: payerTokenAccount.address,
-            isSigner: false,
-            isWritable: true,
-        },
-        {
-            pubkey: mintPubkey,
-            isSigner: true,
-            isWritable: true,
-        },
-        {
-            pubkey: vault,
-            isSigner: true,
-            isWritable: true,
-        },
-        {
-            pubkey: vaultTokenAccount.address,
-            isSigner: false,
-            isWritable: true,
-        },
-        {
-            pubkey: TOKEN_PROGRAM_ID,
-            isSigner: false,
-            isWritable: false,
-        },
-        {
-            pubkey: SystemProgram.programId,
-            isSigner: false,
-            isWritable: false,
-        },
-    ];
-    console.log("AAAAAAAAAAAAAAAAAA")
+                {
+                    pubkey: programId,
+                    isSigner: false,
+                    isWritable: true,
+                },
+                {
+                    pubkey: payer.publicKey,
+                    isSigner: true,
+                    isWritable: true,
+                },
+                {
+                    pubkey: payerTokenAccount.address,
+                    isSigner: false,
+                    isWritable: true,
+                },
+                {
+                    pubkey: mintPubkey,
+                    isSigner: false,
+                    isWritable: true,
+                },
+                {
+                    pubkey: vault,
+                    isSigner: false,
+                    isWritable: true,
+                },
+                {
+                    pubkey: vaultTokenAccount.address,
+                    isSigner: false,
+                    isWritable: true,
+                },
+                {
+                    pubkey: TOKEN_PROGRAM_ID,
+                    isSigner: false,
+                    isWritable: false,
+                },
+                {
+                    pubkey: SystemProgram.programId,
+                    isSigner: false,
+                    isWritable: false,
+                },
+            ];
     return { data, keys }
 }

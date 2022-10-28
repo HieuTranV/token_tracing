@@ -28,13 +28,8 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: u32) -> Pr
         return Err(TokenTracingError::InvalidAccountAddress.into());
     }
 
-    // let vault_data = spl_token::state::Account::unpack(&vault.data.borrow())?;
-    // if &vault_data.mint != mint.key {
-    //     msg!("Invalid mint token");
-    //     return Err(TokenSwapError::InvalidMint.into());
-    // }
-
     msg!("transfer SOL from payer to program");
+    
     let pay_sol = system_instruction::transfer(payer.key, vault.key, amount.into());
     let pay_sol_transation_account = [system_program.clone(), payer.clone(), vault.clone()];
     invoke(&pay_sol, 
@@ -48,7 +43,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: u32) -> Pr
         &payer_token_account.key,
         &vault.key,
         &[],
-        (amount * 10).into(),
+        ((amount as u64) *( 10 as u64) as u64),
      )?;
     
     invoke_signed(
