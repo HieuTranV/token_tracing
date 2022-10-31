@@ -1,5 +1,8 @@
 # Token Tracing
-
+Install
+```
+npm install
+```
 Exchange 1 SOL to 10 MOVE
 ```bash
 npm run start 1
