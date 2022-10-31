@@ -330,14 +330,14 @@ async fn test_SOL_to_token() {
         payer_after.lamports
     );
 
-    // check if payer balance is increase
+    // check if vault balance is increase
     ma::assert_lt!(
         vault_before.lamports,
         vault_after.lamports
     );
 }
 
-
+//Wrong unit test
 #[tokio::test]
 async fn test_token_to_SOL() {
     let program_id = Pubkey::new_unique();
@@ -364,6 +364,32 @@ async fn test_token_to_SOL() {
     .await
     .unwrap();
     
+    let vault_ata = Keypair::new();
+    create_and_initialize_account_for_mint(
+        &mut banks_client,
+        recent_blockhash,
+        &spl_token::id(),
+        &vault_ata,
+        &mint,
+        &payer,
+    )
+    .await
+    .unwrap();
+
+    mint_amount(
+        &mut banks_client,
+        recent_blockhash,
+        &spl_token::id(),
+        &vault_ata.pubkey(),
+        &mint.pubkey(),
+        &payer,
+        &payer,
+        100_u64,
+        9_u8,
+    )
+    .await
+    .unwrap();
+
     let (vault, vault_bump_seed) = Pubkey::find_program_address(&[b"vault", &mint.pubkey().to_bytes()], &program_id);
 
     let payer_account = AccountMeta {
@@ -403,7 +429,10 @@ async fn test_token_to_SOL() {
     banks_client.process_transaction(transaction).await.unwrap();
 
 
-    let vault_ata = get_associated_token_address(&vault, &mint.pubkey());
+    // let vault_ata = banks_client
+    //     .get_account(token_account.pubkey().clone())
+    //     .await
+    //     .unwrap();
     let payer_ata = get_associated_token_address(&payer.pubkey(), &mint.pubkey());
     
     let amount = 1000;
@@ -422,7 +451,7 @@ async fn test_token_to_SOL() {
                 AccountMeta::new(payer_ata, false),
                 AccountMeta::new(mint.pubkey(), false),
                 AccountMeta::new(vault, false),
-                AccountMeta::new(vault_ata, false),
+                AccountMeta::new(vault_ata.pubkey(), false),
                 AccountMeta::new_readonly(spl_token::id(), false),
                 AccountMeta::new(system_program::id(), false),
             ],
@@ -432,12 +461,28 @@ async fn test_token_to_SOL() {
     transation_token_to_SOL.sign(&[&payer], recent_blockhash);
     // let payer_balance_before = banks_client.get_balance(payer.pubkey()).await.unwrap();
     let vault_balance_before = banks_client.get_account(vault.clone()).await.unwrap().expect("vault balance before");
+    let vault_ata_before = banks_client
+        .get_account(vault_ata.pubkey().clone())
+        .await
+        .unwrap()
+        .expect("vault_ata_before");
+    
+    let vault_ata_data_before = Account::unpack(&vault_ata_before.data).unwrap();
+
     // let vault_data = Account::unpack(&vault_balance_before.data).unwrap();
     banks_client.process_transaction(transation_token_to_SOL).await.unwrap();
     
     // let payer_balance_after = banks_client.get_balance(payer.pubkey()).await.unwrap();
     let vault_balance_after = banks_client.get_account(vault.clone()).await.unwrap().expect("vault balance after");
     
+    let vault_ata_after = banks_client
+        .get_account(vault_ata.pubkey().clone())
+        .await
+        .unwrap()
+        .expect("vault_ata_after");
+    
+    let vault_ata_data_after = Account::unpack(&vault_ata_after.data).unwrap();
+
     // check if payer balance is increase
     // ma::assert_lt!(
     //     payer_balance_before,
@@ -445,8 +490,8 @@ async fn test_token_to_SOL() {
     // );
 
     // check if payer balance is decrease
-    ma::assert_gt!(
-        2,
+    ma::assert_eq!(
+        1,
         1
     );
 }
